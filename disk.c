@@ -27,8 +27,7 @@ typedef struct PACKED {
 
 //--------------------------------------------------------------------------------------------------
 
-bool disk_read_partitions(DiskOps* ops, Partitions* partitions) {
-    // @Bug.
+bool disk_read_partitions(DiskOps* ops, Disk* disk) {
     u8 data[BLOCK_SIZE];
 
     if (ops->read(MBR_ADDRESS, data) == false) {
@@ -42,10 +41,10 @@ bool disk_read_partitions(DiskOps* ops, Partitions* partitions) {
     }
 
     for (int i = 0; i < PARTITION_COUNT; i++) {
-        partitions->index[i].status  = header->entries[i].status;
-        partitions->index[i].type    = header->entries[i].type;
-        partitions->index[i].address = header->entries[i].address;
-        partitions->index[i].size    = header->entries[i].size;
+        disk->partitions[i].status  = header->entries[i].status;
+        disk->partitions[i].type    = header->entries[i].type;
+        disk->partitions[i].address = header->entries[i].address;
+        disk->partitions[i].size    = header->entries[i].size;
     }
 
     return true;
