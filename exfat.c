@@ -206,7 +206,7 @@ static int follow_path(Exfat* exfat, String* path) {
 
 //--------------------------------------------------------------------------------------------------
 
-static Exfat* get_exfat_volume(String* path) {
+static Exfat* enter_exfat_volume(String* path) {
     String mountpoint;
 
     if (get_next_valid_subpath(path, &mountpoint) == false) {
@@ -235,7 +235,7 @@ int exfat_open_directory(Dir* dir, char* path) {
     String subpath;
     String input_path = convert_to_string(path);
 
-    Exfat* exfat = get_exfat_volume(&input_path);
+    Exfat* exfat = enter_exfat_volume(&input_path);
 
     if (exfat == 0) {
         return EXFAT_MOUNTPOINT_ERROR;
