@@ -23,7 +23,11 @@ typedef int8_t  s8;
 
 #define PACKED __attribute__((packed))
 
+#define limit(value, max) ((value > max) ? (max) : (value))
+
 //--------------------------------------------------------------------------------------------------
+
+typedef u16 Unicode;
 
 typedef struct {
     char* text;
