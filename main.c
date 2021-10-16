@@ -7,6 +7,7 @@
 #include "utilities.h"
 #include "disk.h"
 #include "exfat.h"
+#include "cli.h"
 
 //--------------------------------------------------------------------------------------------------
 
@@ -25,7 +26,6 @@ static bool disk_read(u32 address, u8* data) {
 //--------------------------------------------------------------------------------------------------
 
 static bool disk_write(u32 address, const u8* data) {
-    printf("Writing the file\n");
     if (fseek(filesystem_file, address * BLOCK_SIZE, SEEK_SET)) {
         return false;
     }
@@ -35,9 +35,9 @@ static bool disk_write(u32 address, const u8* data) {
 
 //--------------------------------------------------------------------------------------------------
 
-static Directory dir;
+static File dir;
 static File file;
-static DirectoryInfo info;
+static FileInfo info;
 
 static const char* month_names[] = {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" 
@@ -45,9 +45,9 @@ static const char* month_names[] = {
 
 //--------------------------------------------------------------------------------------------------
 
-static void print_directory(Directory* dir) {
+static void print_directory(File* file) {
     while (1) {
-        int status = exfat_read_directory(dir, &info);
+        int status = exfat_read_directory(file, &info);
         if (status == EXFAT_END_OF_FILE) break;
         if (status) exit(5);
 
@@ -101,20 +101,24 @@ int main(int argument_count, const char** arguments) {
 
     Disk disk;
     assert(disk_read_partitions(&ops, &disk));
-    assert(exfat_mount(&ops, disk.partitions[0].address, "disk0") == EXFAT_SUCCESS);
+    assert(exfat_mount(&ops, disk.partitions[0].address, "disk0") == EXFAT_OK);
+
+    while (1) {
+        cli_task();
+    }
 
     char volume_label[12];
     status = exfat_get_volume_label(&dir, "disk0", volume_label);
     printf("Volume label : %s\n", volume_label);
-
     status = exfat_set_volume_label(&dir, "disk0", "AWEEE");
-    
-    status = exfat_open_directory(&dir, "disk0/source/include");
+
+    status = exfat_open_directory(&dir, "disk0/");
     if (status) return -status;
+
 
     print_directory(&dir);
 
-    status = exfat_open_file(&file, "disk0/source/include/parse_tree.h");
+    status = exfat_open_file(&file, "disk0/source/make/makefile");
     if (status) return -status;
 
     status = exfat_set_file_offset(&file, 100);

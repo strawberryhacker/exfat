@@ -8,15 +8,15 @@
 
 //--------------------------------------------------------------------------------------------------
 
-#define MOUNTPOINT_NAME_SIZE 64
-#define NAME_ENTRY_CHARACTERS 15
-#define MAX_FILE_NAME_LENGTH 257
+#define MOUNTPOINT_NAME_SIZE    64
+#define NAME_ENTRY_CHARACTERS   15
+#define MAX_FILE_NAME_LENGTH    257
 
 //--------------------------------------------------------------------------------------------------
 
 enum {
     EXFAT_END_OF_FILE                 =  1,
-    EXFAT_SUCCESS                     =  0,
+    EXFAT_OK                          =  0,
     EXFAT_DISK_ERROR                  = -1,
     EXFAT_BAD_HEADER_SIGNATURE        = -2,
     EXFAT_NO_EXFAT_VOLUME             = -3,
@@ -30,6 +30,8 @@ enum {
     EXFAT_ATTRIBUTE_ERROR             = -11,
     EXFAT_FILE_OFFSET_OUT_OF_RANGE    = -12,
     EXFAT_DIRECTORY_ENTRY_ERROR       = -13,
+
+    EXFAT_WRONG_MOUNTPOINT_IN_PATH    = -14,
 };
 
 enum {
@@ -42,156 +44,36 @@ enum {
 
 //--------------------------------------------------------------------------------------------------
 
-typedef struct PACKED {
-    u64 partition_offset;
-    u64 volume_length;
-    u32 fat_offset;
-    u32 fat_length;
-    u32 cluster_heap_offset;
-    u32 cluster_count;
-    u32 root_cluster;
-    u32 serial_number;
-    u16 revision;
-    u16 volume_flags;
-    u8  bytes_per_sector_shift;
-    u8  sectors_per_cluster_shift;
-    u8  fat_count;
-    u8  drive_select;
-    u8  percent_in_use;
-} ExfatInfo;
-
-typedef struct PACKED {
-    u8        jump_boot[3];
-    char      name[8];
-    u8        must_be_zero[53]; 
-    ExfatInfo info;
-    u8        reserved[7];
-    u8        boot_code[390];
-    u16       signature;
-} ExfatHeader;
+typedef struct ExFat ExFat;
 
 typedef struct {
-    u8 type;
-    u8 flags;
-    u8 reserved[18];
-    u32 first_cluster;
-    u64 length;
-} BitmapEntry;
+    ExFat* exfat;
 
-typedef struct {
-    u8 type;
-    u8 reserved0[3];
-    u32 checksum;
-    u8 reserved1[2];
-    u32 first_cluster;
-    u64 length;
-} UpcaseEntry;
+    u8 window[BLOCK_SIZE];
 
-typedef struct {
-    u8 type;
-    u8 label_length;
-    Unicode label[11];
-    u8 reserved[8];
-} VolumeLabelEntry;
+    bool window_valid;
+    bool window_dirty;
+    u32  window_address;
+    int  window_index;
 
-typedef struct {
-    u8 type;
-    u8 secondary_count;
-    u16 checksum;
-    u16 attributes;
-    u8 reserved0[2];
-    u32 create_time;
-    u32 modified_time;
-    u32 access_time;
-    u8 create_time_10ms;
-    u8 modified_time_10ms;
-    u8 create_utc_offset;
-    u8 modified_utc_offset;
-    u8 accessed_utc_offset;
-    u8 reserved1[7];
-} DirectoryEntry;
-
-typedef struct {
-    u8 type;
-    u8 flags;
-    u8 reserved0;
-    u8 name_length;
-    u16 name_checksum;
-    u8 reserved1[2];
-    u64 valid_length;
-    u8 reserved2[4];
-    u32 first_cluster;
-    u64 length;
-} StreamEntry;
-
-typedef struct {
-    u8 type;
-    u8 flags;
-    Unicode name[NAME_ENTRY_CHARACTERS];
-} NameEntry;
-
-typedef union {
-    u8 type;
-    BitmapEntry       bitmap;
-    UpcaseEntry       upcase;
-    VolumeLabelEntry  volume_label;
-    DirectoryEntry    directory;
-    StreamEntry       stream;
-    NameEntry         name;
-} Entry;
-
-typedef struct {
-    DiskOps ops;
-    String mountpoint;
-    char mountpoint_buffer[MOUNTPOINT_NAME_SIZE];
-
-    u32 volume_address;
-    ExfatInfo info;
-
-    u32 cluster_heap_address;
-    u32 fat_table_address;
-    
-    u32 bytes_per_sector_mask;
-    u32 sectors_per_cluster_mask;
-    u32 cluster_size;
-} Exfat;
-
-typedef struct {
-    u8 buffer[BLOCK_SIZE];
-    u32 buffer_address;
-    bool valid;
-    bool dirty;
-
-    u32 cluster;
-    u32 address;
-    u32 offset;
-
+    // @Cleanup: I do not know if we need to store all these fields.
     u64 file_length;
     u64 file_offset;
     u64 file_address;
     u64 valid_length;
     u32 file_cluster;
-
     u64 parent_file_address;
-
-    Exfat* exfat;
-} Object, Directory, File;
+} File;
 
 typedef struct {
-    u32 cluster;
-    u32 address;
-    u32 offset;
-} SavedLocation;
-
-typedef struct {
-    u8 millisecond;
-    u8 second;
-    u8 minute;
-    u8 hour;
-    u8 day;
-    u8 month;
+    u8  millisecond;
+    u8  second;
+    u8  minute;
+    u8  hour;
+    u8  day;
+    u8  month;
     u16 year;
-    u8 utc;
+    u8  utc;
 } Timestamp;
 
 typedef struct {
@@ -203,20 +85,16 @@ typedef struct {
     Timestamp create_time;
     Timestamp access_time;
     Timestamp modified_time;
-} DirectoryInfo;
+} FileInfo;
 
 //--------------------------------------------------------------------------------------------------
 
 void exfat_init();
-
-int exfat_get_volume_label(Directory* dir, char* path, char* volume_label);
-int exfat_set_volume_label(Directory* dir, char* path, char* volume_label);
-
 int exfat_mount(DiskOps* ops, u32 address, char* mountpoint);
-
-int exfat_open_directory(Directory* dir, char* path);
-int exfat_read_directory(Directory* dir, DirectoryInfo* info);
-
+int exfat_get_volume_label(File* file, char* mountpoint, char* volume_label);
+int exfat_set_volume_label(File* file, char* mountpoint, char* volume_label);
+int exfat_open_directory(File* file, char* path);
+int exfat_read_directory(File* file, FileInfo* info);
 int exfat_open_file(File* file, char* path);
 int exfat_file_read(File* file, void* data, int size, int* bytes_written);
 int exfat_set_file_offset(File* file, u64 offset);
